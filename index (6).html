@@ -1,0 +1,461 @@
+<title>Projeto Itapoá Manutenções</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600&display=swap">
+<style>
+/* Layout: painel de oficina — faixa de status no topo, indicadores, agenda por veículo, depois o plano completo */
+:root {
+  --bg: #f3f4f2;
+  --panel: #ffffff;
+  --fg: #1d2326;
+  --muted: #5f686d;
+  --line: #dcdfdc;
+  --accent: #d9811a;
+  --c1: #2f6f8f; --c2: #d9811a; --c3: #6a8f3a;
+  --ok: #2e7d4f; --warn: #b4690e; --bad: #c0392b;
+  --font-ui: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --font-num: "Barlow Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15191b; --panel: #1d2225; --fg: #e6e9e7; --muted: #9aa3a7; --line: #2f3639;
+  --accent: #f0a043; --c1: #6aaed0; --c2: #f0a043; --c3: #9cc46a;
+  --ok: #5cc48a; --warn: #f0a043; --bad: #ef6b5d; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #15191b; --panel: #1d2225; --fg: #e6e9e7; --muted: #9aa3a7; --line: #2f3639;
+  --accent: #f0a043; --c1: #6aaed0; --c2: #f0a043; --c3: #9cc46a;
+  --ok: #5cc48a; --warn: #f0a043; --bad: #ef6b5d; color-scheme: dark; }
+
+body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 1180px; margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 48px; display: flex; flex-direction: column; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; border-bottom: 3px solid var(--accent); padding-bottom: 14px; }
+h1 { font-family: var(--font-num); font-weight: 600; font-size: 2.1rem; letter-spacing: .01em; margin: 0; text-wrap: balance; }
+.eyebrow { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.fonte { font-size: .8rem; color: var(--muted); text-align: right; }
+.take { font-size: 1.05rem; margin: 0; max-width: 70ch; }
+.take b { color: var(--accent); font-weight: 600; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: 12px; }
+.kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; }
+.kpi .lbl { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.kpi .val { font-family: var(--font-num); font-size: 2.4rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.kpi .sub { font-size: .8rem; color: var(--muted); }
+.kpi.alerta .val { color: var(--bad); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 18px; min-width: 0; }
+.card h2 { font-size: 1.05rem; font-weight: 600; margin: 0; }
+.note { font-size: .8rem; color: var(--muted); margin: 2px 0 12px; }
+
+.scroll { overflow: auto; max-height: 30rem; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: .9rem; }
+th { position: sticky; top: 0; background: var(--panel); text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th button { all: unset; cursor: pointer; }
+th button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+td { padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td.wrap-txt { white-space: normal; }
+.placa { font-family: var(--font-num); font-weight: 600; letter-spacing: .04em; font-size: 1rem; }
+.pill { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: .75rem; font-weight: 500; border: 1px solid var(--line); color: var(--muted); }
+.pill.atrasada { color: var(--bad); border-color: currentColor; }
+.pill.proxima { color: var(--warn); border-color: currentColor; }
+.pill.oficina { color: var(--c1); border-color: currentColor; }
+.pill.concluida { color: var(--ok); border-color: currentColor; }
+.em.atrasada { color: var(--bad); font-weight: 600; }
+.em.proxima { color: var(--warn); font-weight: 600; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: .8rem; color: var(--muted); margin-bottom: 8px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.12); padding: 6px 10px; font-size: .8rem; white-space: nowrap; z-index: 2; }
+.tip .t { color: var(--muted); margin-bottom: 2px; }
+
+.agenda { overflow-x: auto; }
+.agenda table td, .agenda table th { text-align: center; }
+.agenda table td:first-child, .agenda table th:first-child { text-align: left; }
+.dots { display: inline-flex; gap: 3px; }
+.dot { width: 11px; height: 11px; border-radius: 50%; }
+.dot.feito { outline: 2px solid var(--ok); outline-offset: 1px; }
+
+.ctrl { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.ctrl input, .ctrl select { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); min-width: 0; }
+.ctrl input { flex: 1 1 14rem; }
+.ctrl input:focus-visible, .ctrl select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.vazio { color: var(--muted); font-size: .9rem; padding: 12px 0; }
+footer { font-size: .78rem; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Projeto Itapoá Manutenções</h1>
+    </div>
+    <div class="fonte" id="fonte">Dados da aba Preventiva Asia</div>
+  </header>
+
+  <p class="take" id="take">Carregando…</p>
+
+  <section class="kpis">
+    <div class="kpi"><div class="lbl">Próximos 30 dias</div><div class="val" id="k-30">–</div><div class="sub">serviços programados</div></div>
+    <div class="kpi" id="kpi-atr"><div class="lbl">Atrasadas</div><div class="val" id="k-atr">–</div><div class="sub">previsão vencida sem entrada</div></div>
+    <div class="kpi"><div class="lbl">Na oficina</div><div class="val" id="k-of">–</div><div class="sub">com entrada, sem saída</div></div>
+    <div class="kpi"><div class="lbl">Concluídas</div><div class="val" id="k-ok">–</div><div class="sub" id="k-tot">do plano</div></div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Próximas paradas na oficina</h2>
+      <p class="note">Próximos 60 dias e atrasadas, serviços do mesmo caminhão na mesma data juntos</p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Data</th><th>Veículo</th><th>Serviços</th><th>Em</th></tr></thead>
+          <tbody id="t-paradas"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Serviços por mês</h2>
+      <p class="note">Quantidade programada em cada mês, por tipo de serviço</p>
+      <div class="legend" id="legenda"></div>
+      <div class="chart" id="chart"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Agenda por veículo</h2>
+    <p class="note">Cada ponto é um serviço previsto no mês; contorno verde indica concluído</p>
+    <div class="agenda"><table id="t-agenda"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Plano completo</h2>
+    <p class="note">Status calculado a partir da data de hoje</p>
+    <div class="ctrl">
+      <input type="search" id="busca" placeholder="Buscar placa, serviço, oficina…" aria-label="Buscar">
+      <select id="f-vei" aria-label="Veículo"><option value="">Todos os veículos</option></select>
+      <select id="f-tipo" aria-label="Serviço"><option value="">Todos os serviços</option></select>
+      <select id="f-st" aria-label="Status"><option value="">Todos os status</option></select>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th><button data-k="veiculo">Veículo</button></th>
+          <th><button data-k="manutencao">Serviço</button></th>
+          <th><button data-k="oficina">Oficina</button></th>
+          <th><button data-k="previsao">Previsão</button></th>
+          <th><button data-k="entrada">Entrada</button></th>
+          <th><button data-k="saida">Saída</button></th>
+          <th><button data-k="dias">Dias</button></th>
+          <th><button data-k="status">Status</button></th>
+        </tr></thead>
+        <tbody id="t-plano"></tbody>
+      </table>
+      <div class="vazio" id="vazio" hidden>Nenhuma preventiva com esses filtros.</div>
+    </div>
+  </section>
+
+  <footer id="rodape"></footer>
+</div>
+
+<script>
+/* ===== CONFIGURAÇÃO =====
+   Para dados ao vivo: no Google Sheets, Arquivo > Compartilhar > Publicar na Web,
+   escolha a aba "Preventiva Asia", formato CSV, e cole o link abaixo.
+   Sem link (ou se falhar), a página usa a cópia embutida em DADOS_FIXOS. */
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS6w5SV3IAdzWUO4MN02fLUcGFiVBaSEz3-Q4jO4SAVHrOmzQreDM02WEbrEvMotwso4rDLUY1fhEd4/pub?gid=1139682412&single=true&output=csv";
+
+const DADOS_FIXOS = `Veículo,Manutenção,Mecanica,Previsao,Data de entrada,Data de saida,Observação
+MKG1B33,TROCA DE OLEO E FILTROS,JS TRUCK,05/11/2026,,,
+MKG1B33,TROCA DE OLEO E FILTROS,JS TRUCK,18/12/2026,,,
+MKG1B33,TROCA DE OLEO E FILTROS,JS TRUCK,05/02/2027,,,
+MKG1B33,TROCA DE OLEO E FILTROS,JS TRUCK,15/04/2027,,,
+MKG1B33,ALINHAMENTO,BORRACHARIA ZANCAN,18/12/2026,,,
+MKG1B33,ALINHAMENTO,BORRACHARIA ZANCAN,05/02/2027,,,
+MKG1B33,ALINHAMENTO,BORRACHARIA ZANCAN,15/04/2027,,,
+MKG1B33,ALINHAMENTO,BORRACHARIA ZANCAN,17/06/2027,,,
+MKG1B33,FREIOS,AR MOLAS,18/12/2026,,,
+MKG1B33,FREIOS,AR MOLAS,05/02/2027,,,
+MKG1B33,FREIOS,AR MOLAS,15/04/2027,,,
+MKG1B33,FREIOS,AR MOLAS,17/06/2027,,,
+QHC7F95,TROCA DE OLEO E FILTROS,JC MECANICA,7/12/2026,,,
+QHC7F95,TROCA DE OLEO E FILTROS,JC MECANICA,8/2/2027,,,
+QHC7F95,TROCA DE OLEO E FILTROS,JC MECANICA,5/4/2027,,,
+QHC7F95,TROCA DE OLEO E FILTROS,JC MECANICA,07/06/2027,,,
+QHC7F95,ALINHAMENTO,BORRACHARIA ZANCAN,07/12/2026,,,
+QHC7F95,ALINHAMENTO,BORRACHARIA ZANCAN,08/02/2027,,,
+QHC7F95,ALINHAMENTO,BORRACHARIA ZANCAN,05/04/2027,,,
+QHC7F95,ALINHAMENTO,BORRACHARIA ZANCAN,07/06/2027,,,
+QHC7F95,FREIOS,AR MOLAS,07/12/2026,,,
+QHC7F95,FREIOS,AR MOLAS,08/02/2027,,,
+QHC7F95,FREIOS,AR MOLAS,05/04/2027,,,
+QHC7F95,FREIOS,AR MOLAS,07/06/2027,,,
+MLX8C23,TROCA DE OLEO E FILTROS,JS TRUCK,12/11/2026,,,
+MLX8C23,TROCA DE OLEO E FILTROS,JS TRUCK,22/01/2027,,,
+MLX8C23,TROCA DE OLEO E FILTROS,JS TRUCK,10/03/2027,,,
+MLX8C23,TROCA DE OLEO E FILTROS,JS TRUCK,20/05/2027,,,
+MLX8C23,ALINHAMENTO,BORRACHARIA ZANCAN,12/11/2026,,,
+MLX8C23,ALINHAMENTO,BORRACHARIA ZANCAN,22/01/2027,,,
+MLX8C23,ALINHAMENTO,BORRACHARIA ZANCAN,10/03/2027,,,
+MLX8C23,ALINHAMENTO,BORRACHARIA ZANCAN,20/05/2027,,,
+MLX8C23,FREIOS,AR MOLAS,12/11/2026,,,
+MLX8C23,FREIOS,AR MOLAS,22/01/2027,,,
+MLX8C23,FREIOS,AR MOLAS,10/03/2027,,,
+MLX8C23,FREIOS,AR MOLAS,20/05/2027,,,
+FRP3J31,TROCA DE OLEO E FILTROS,JS TRUCK,17/11/2026,,,
+FRP3J31,TROCA DE OLEO E FILTROS,JS TRUCK,11/01/2027,,,
+FRP3J31,TROCA DE OLEO E FILTROS,JS TRUCK,12/03/2027,,,
+FRP3J31,TROCA DE OLEO E FILTROS,JS TRUCK,06/05/2027,,,
+FRP3J31,ALINHAMENTO,BORRACHARIA ZANCAN,17/11/2026,,,
+FRP3J31,ALINHAMENTO,BORRACHARIA ZANCAN,11/01/2027,,,
+FRP3J31,ALINHAMENTO,BORRACHARIA ZANCAN,12/03/2027,,,
+FRP3J31,ALINHAMENTO,BORRACHARIA ZANCAN,06/05/2027,,,
+FRP3J31,FREIOS,AR MOLAS,17/11/2026,,,
+FRP3J31,FREIOS,AR MOLAS,11/01/2027,,,
+FRP3J31,FREIOS,AR MOLAS,12/03/2027,,,
+FRP3J31,FREIOS,AR MOLAS,06/05/2027,,,`;
+const DATA_COPIA = "26/10/2026";
+
+/* ===== LEITURA ===== */
+function parseCSV(txt) {
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < txt.length; i++) {
+    const c = txt[i];
+    if (q) { if (c === '"') { if (txt[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && txt[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+const norm = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+function parseData(s) {
+  const m = String(s || "").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const y = +m[3], mo = +m[2], d = +m[1];
+  if (y < 2000 || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+const NOMES = { "troca de oleo e filtros": "Troca de óleo e filtros", "alinhamento": "Alinhamento", "freios": "Freios" };
+const titulo = s => s.toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
+function linhas(txt) {
+  const r = parseCSV(txt);
+  const hi = r.findIndex(l => l.some(c => norm(c).startsWith("veiculo")));
+  if (hi < 0) return [];
+  const h = r[hi].map(norm);
+  const col = k => h.findIndex(c => c.startsWith(k));
+  const iv = col("veiculo"), im = col("manutencao"), io = col("mecanica"), ip = col("previsao"), ie = col("data de entrada"), is = col("data de saida");
+  return r.slice(hi + 1).map(l => ({
+    veiculo: (l[iv] || "").trim().toUpperCase(),
+    manutencao: NOMES[norm(l[im])] || titulo((l[im] || "").trim()),
+    oficina: titulo((l[io] || "").trim()),
+    previsao: parseData(l[ip]),
+    entrada: parseData(l[ie]),
+    saida: parseData(l[is])
+  })).filter(x => x.veiculo && x.previsao);
+}
+
+/* ===== CÁLCULO ===== */
+const hojeISO = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+const diasAte = iso => Math.round((Date.parse(iso + "T00:00:00Z") - Date.parse(hojeISO + "T00:00:00Z")) / 864e5);
+const br = iso => iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "";
+const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+const mesLbl = ym => MESES[+ym.slice(5, 7) - 1] + "/" + ym.slice(2, 4);
+const emTxt = d => d === 0 ? "hoje" : d < 0 ? `${-d} d atrás` : d === 1 ? "amanhã" : `${d} dias`;
+const CLS = { "Atrasada": "atrasada", "Próxima": "proxima", "Na oficina": "oficina", "Concluída": "concluida", "Programada": "" };
+
+function comStatus(r) {
+  const dias = diasAte(r.previsao);
+  let status = "Programada";
+  if (r.saida) status = "Concluída";
+  else if (r.entrada) status = "Na oficina";
+  else if (dias < 0) status = "Atrasada";
+  else if (dias <= 30) status = "Próxima";
+  return { ...r, dias, status };
+}
+
+/* ===== DESENHO ===== */
+let DADOS = [];
+const $ = id => document.getElementById(id);
+const td = (txt, cls) => { const e = document.createElement("td"); e.textContent = txt; if (cls) e.className = cls; return e; };
+
+function resumo() {
+  const pend = DADOS.filter(r => r.status !== "Concluída");
+  const fut = pend.filter(r => r.dias >= 0).sort((a, b) => a.dias - b.dias);
+  const atr = DADOS.filter(r => r.status === "Atrasada");
+  $("k-30").textContent = DADOS.filter(r => r.status === "Próxima").length;
+  $("k-atr").textContent = atr.length;
+  $("kpi-atr").classList.toggle("alerta", atr.length > 0);
+  $("k-of").textContent = DADOS.filter(r => r.status === "Na oficina").length;
+  $("k-ok").textContent = DADOS.filter(r => r.status === "Concluída").length;
+  $("k-tot").textContent = `de ${DADOS.length} no plano`;
+  const t = $("take"); t.textContent = "";
+  if (atr.length) {
+    t.append(document.createTextNode("Atenção: "));
+    const b = document.createElement("b"); b.textContent = `${atr.length} preventiva${atr.length > 1 ? "s" : ""} atrasada${atr.length > 1 ? "s" : ""}`; t.append(b);
+    t.append(document.createTextNode(". "));
+  }
+  if (fut.length) {
+    const p = fut[0];
+    const mesmos = fut.filter(r => r.veiculo === p.veiculo && r.previsao === p.previsao).map(r => r.manutencao.toLowerCase());
+    t.append(document.createTextNode("Próxima parada: "));
+    const b = document.createElement("b"); b.textContent = `${p.veiculo} em ${br(p.previsao)}`; t.append(b);
+    t.append(document.createTextNode(` (${emTxt(p.dias)}), ${mesmos.join(", ")}.`));
+  } else if (!atr.length) t.textContent = "Nenhuma preventiva pendente no plano.";
+}
+
+function paradas() {
+  const m = new Map();
+  DADOS.filter(r => r.status !== "Concluída" && r.dias <= 60).forEach(r => {
+    const k = r.veiculo + "|" + r.previsao;
+    if (!m.has(k)) m.set(k, { ...r, servicos: [] });
+    m.get(k).servicos.push(r.manutencao);
+  });
+  const tb = $("t-paradas"); tb.innerHTML = "";
+  const lista = [...m.values()].sort((a, b) => a.previsao.localeCompare(b.previsao) || a.veiculo.localeCompare(b.veiculo));
+  if (!lista.length) { const tr = document.createElement("tr"); const c = td("Nada programado nos próximos 60 dias."); c.colSpan = 4; c.className = "vazio"; tr.append(c); tb.append(tr); return; }
+  lista.forEach(r => {
+    const tr = document.createElement("tr");
+    tr.append(td(br(r.previsao)), td(r.veiculo, "placa"), td(r.servicos.join(" + "), "wrap-txt"), td(emTxt(r.dias), "em " + (r.dias < 0 ? "atrasada" : r.dias <= 30 ? "proxima" : "")));
+    tb.append(tr);
+  });
+}
+
+const tipos = () => [...new Set(DADOS.map(r => r.manutencao))].sort();
+const cor = t => ["var(--c1)", "var(--c2)", "var(--c3)", "var(--muted)"][Math.max(0, tipos().indexOf(t)) % 4];
+
+function grafico() {
+  const box = $("chart"); box.innerHTML = "";
+  const leg = $("legenda"); leg.innerHTML = "";
+  const T = tipos();
+  T.forEach(t => { const s = document.createElement("span"); const sw = document.createElement("span"); sw.className = "sw"; sw.style.background = cor(t); s.append(sw, document.createTextNode(t)); leg.append(s); });
+  const meses = [...new Set(DADOS.map(r => r.previsao.slice(0, 7)))].sort();
+  if (!meses.length) return;
+  const cont = meses.map(m => { const o = { m }; T.forEach(t => o[t] = DADOS.filter(r => r.previsao.slice(0, 7) === m && r.manutencao === t).length); o.total = T.reduce((s, t) => s + o[t], 0); return o; });
+  const W = Math.max(320, box.clientWidth || 480), H = 240, ml = 30, mr = 6, mt = 10, mb = 26;
+  const maxV = Math.max(...cont.map(o => o.total));
+  const step = maxV <= 6 ? 1 : maxV <= 12 ? 2 : 5;
+  const top = Math.ceil(maxV / step) * step || 1;
+  const y = v => H - mb - (v / top) * (H - mt - mb);
+  const band = (W - ml - mr) / meses.length;
+  const bw = Math.min(32, band * 0.6);
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (n, a) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); return e; };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Serviços por mês" });
+  for (let v = 0; v <= top; v += step) {
+    svg.append(el("line", { x1: ml, x2: W - mr, y1: y(v), y2: y(v), stroke: "var(--line)", "stroke-width": 1 }));
+    const tx = el("text", { x: ml - 6, y: y(v), dy: "0.32em", "text-anchor": "end", fill: "var(--muted)", "font-size": 11 }); tx.textContent = v; svg.append(tx);
+  }
+  const tip = document.createElement("div"); tip.className = "tip"; tip.hidden = true;
+  cont.forEach((o, i) => {
+    const x = ml + band * i + (band - bw) / 2;
+    let acc = 0;
+    T.forEach(t => {
+      if (!o[t]) return;
+      const y0 = y(acc), y1 = y(acc + o[t]);
+      svg.append(el("rect", { x, y: y1, width: bw, height: Math.max(0, y0 - y1 - 1), rx: 3, fill: cor(t) }));
+      acc += o[t];
+    });
+    const lb = el("text", { x: x + bw / 2, y: H - 8, "text-anchor": "middle", fill: "var(--muted)", "font-size": 11 }); lb.textContent = mesLbl(o.m); svg.append(lb);
+    const hit = el("rect", { x: ml + band * i, y: mt, width: band, height: H - mt - mb, fill: "transparent" });
+    hit.addEventListener("mousemove", ev => {
+      tip.innerHTML = "";
+      const h = document.createElement("div"); h.className = "t"; h.textContent = `${mesLbl(o.m)} · ${o.total} serviço${o.total !== 1 ? "s" : ""}`; tip.append(h);
+      T.forEach(t => { if (!o[t]) return; const l = document.createElement("div"); const sw = document.createElement("span"); sw.className = "sw"; sw.style.background = cor(t); l.append(sw, document.createTextNode(`${t}: ${o[t]}`)); tip.append(l); });
+      tip.hidden = false;
+      const r = box.getBoundingClientRect();
+      const px = ev.clientX - r.left, py = ev.clientY - r.top;
+      tip.style.left = Math.max(0, Math.min(px + 12, box.clientWidth - tip.offsetWidth)) + "px";
+      tip.style.top = Math.max(0, py - 40) + "px";
+    });
+    hit.addEventListener("mouseleave", () => { tip.hidden = true; });
+    svg.append(hit);
+  });
+  box.append(svg, tip);
+}
+
+function agenda() {
+  const t = $("t-agenda"); t.innerHTML = "";
+  const meses = [...new Set(DADOS.map(r => r.previsao.slice(0, 7)))].sort();
+  const veis = [...new Set(DADOS.map(r => r.veiculo))].sort();
+  const thead = document.createElement("thead"); const hr = document.createElement("tr");
+  const th0 = document.createElement("th"); th0.textContent = "Veículo"; hr.append(th0);
+  meses.forEach(m => { const th = document.createElement("th"); th.textContent = mesLbl(m); hr.append(th); });
+  thead.append(hr); t.append(thead);
+  const tb = document.createElement("tbody");
+  veis.forEach(v => {
+    const tr = document.createElement("tr"); tr.append(td(v, "placa"));
+    meses.forEach(m => {
+      const c = document.createElement("td");
+      const it = DADOS.filter(r => r.veiculo === v && r.previsao.slice(0, 7) === m);
+      if (it.length) {
+        const w = document.createElement("span"); w.className = "dots";
+        it.forEach(r => { const d = document.createElement("span"); d.className = "dot" + (r.status === "Concluída" ? " feito" : ""); d.style.background = cor(r.manutencao); d.title = `${r.manutencao} · ${br(r.previsao)} · ${r.status}`; w.append(d); });
+        c.append(w);
+        const tl = document.createElement("div"); tl.style.fontSize = ".7rem"; tl.style.color = "var(--muted)";
+        tl.textContent = [...new Set(it.map(r => r.previsao.slice(8, 10)))].map(d => "dia " + +d).join(", ");
+        c.append(tl);
+      }
+      tr.append(c);
+    });
+    tb.append(tr);
+  });
+  t.append(tb);
+}
+
+let sortK = "previsao", sortDir = 1;
+function opts(sel, vals) {
+  const cur = sel.value, first = sel.options[0];
+  sel.innerHTML = ""; sel.append(first);
+  vals.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = v; sel.append(o); });
+  sel.value = vals.includes(cur) ? cur : "";
+}
+function plano() {
+  opts($("f-vei"), [...new Set(DADOS.map(r => r.veiculo))].sort());
+  opts($("f-tipo"), tipos());
+  opts($("f-st"), ["Atrasada", "Próxima", "Na oficina", "Programada", "Concluída"].filter(s => DADOS.some(r => r.status === s)));
+  desenhaPlano();
+}
+function desenhaPlano() {
+  const q = norm($("busca").value), fv = $("f-vei").value, ft = $("f-tipo").value, fs = $("f-st").value;
+  let vis = DADOS.filter(r => (!fv || r.veiculo === fv) && (!ft || r.manutencao === ft) && (!fs || r.status === fs)
+    && (!q || norm([r.veiculo, r.manutencao, r.oficina, br(r.previsao), r.status].join(" ")).includes(q)));
+  vis.sort((a, b) => { const x = a[sortK] ?? "", y = b[sortK] ?? ""; return (typeof x === "number" ? x - y : String(x).localeCompare(String(y))) * sortDir || a.veiculo.localeCompare(b.veiculo); });
+  document.querySelectorAll("#t-plano").forEach(() => {});
+  document.querySelectorAll("th button[data-k]").forEach(b => b.parentElement.setAttribute("aria-sort", b.dataset.k === sortK ? (sortDir > 0 ? "ascending" : "descending") : "none"));
+  const tb = $("t-plano"); tb.innerHTML = "";
+  vis.forEach(r => {
+    const tr = document.createElement("tr");
+    const st = document.createElement("td"); const p = document.createElement("span"); p.className = "pill " + CLS[r.status]; p.textContent = r.status; st.append(p);
+    tr.append(td(r.veiculo, "placa"), td(r.manutencao), td(r.oficina), td(br(r.previsao)), td(br(r.entrada)), td(br(r.saida)), td(emTxt(r.dias)), st);
+    tb.append(tr);
+  });
+  $("vazio").hidden = vis.length > 0;
+}
+document.querySelectorAll("th button[data-k]").forEach(b => b.addEventListener("click", () => {
+  if (sortK === b.dataset.k) sortDir = -sortDir; else { sortK = b.dataset.k; sortDir = 1; }
+  desenhaPlano();
+}));
+["busca", "f-vei", "f-tipo", "f-st"].forEach(id => $(id).addEventListener("input", desenhaPlano));
+
+function tudo() { resumo(); paradas(); grafico(); agenda(); plano(); }
+let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(grafico, 150); });
+
+async function iniciar() {
+  let txt = DADOS_FIXOS, origem = `Cópia da aba Preventiva Asia de ${DATA_COPIA}`;
+  if (CSV_URL) {
+    try {
+      const r = await fetch(CSV_URL + (CSV_URL.includes("?") ? "&" : "?") + "t=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      const t = await r.text();
+      if (linhas(t).length) { txt = t; origem = "Ao vivo da planilha · atualizado " + new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }); }
+      else origem += " (não foi possível ler a planilha publicada)";
+    } catch (e) { origem += " (planilha publicada indisponível)"; }
+  }
+  DADOS = linhas(txt).map(comStatus);
+  $("fonte").textContent = origem;
+  $("rodape").textContent = `Hoje: ${br(hojeISO)}. Status: Concluída tem data de saída; Na oficina tem entrada sem saída; Atrasada passou da previsão sem entrada; Próxima vence em até 30 dias.`;
+  tudo();
+}
+iniciar();
+</script>
